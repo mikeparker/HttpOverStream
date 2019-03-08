@@ -36,7 +36,7 @@ namespace HttpOverStream.Server.Owin.Tests
         [HttpGet()]
         public async Task<string> GetTimeoutAsync()
         {
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimeSpan.FromSeconds(5));
             return "This should have timed out.";
         }
     }
@@ -72,10 +72,13 @@ namespace HttpOverStream.Server.Owin.Tests
             {
                 var client = new HttpClient(new DialMessageHandler(new NamedPipeDialer("legacy_test_get")));
                 client.Timeout = TimeSpan.FromMilliseconds(100);
+                var sw = Stopwatch.StartNew();
                 await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () =>
                 {
                     await client.GetAsync("http://localhost/api/e2e-tests/timeout");
                 });
+                sw.Stop();
+                Assert.IsTrue(sw.ElapsedMilliseconds < 1000, $"GetAsync took too long ({sw.ElapsedMilliseconds} ms)");
             }
         }
 
@@ -94,7 +97,7 @@ namespace HttpOverStream.Server.Owin.Tests
 
 
             var dialer = new NamedPipeDialer("test-body-stream");
-            var stream = await dialer.DialAsync(new HttpRequestMessage(), CancellationToken.None);
+            var (stream, _) = await dialer.DialAsync(new HttpRequestMessage(), CancellationToken.None);
             var bodyStream = new BodyStream(stream, payload.Length);
             var data = new byte[4096];
             var read = await bodyStream.ReadAsync(data, 0, data.Length);
@@ -127,7 +130,8 @@ namespace HttpOverStream.Server.Owin.Tests
             }, new NamedPipeListener("test_stream_interuption")))
             {
                 var dialer = new NamedPipeDialer("test_stream_interuption");
-                using (var fuzzyStream = await dialer.DialAsync(new HttpRequestMessage(), CancellationToken.None))
+                var (fuzzyStream, streamReader) = await dialer.DialAsync(new HttpRequestMessage(), CancellationToken.None);
+                using (fuzzyStream)
                 {
                     // just write the first line of a valid http request, and drop the connection
                     var payload = Encoding.ASCII.GetBytes("GET /docs/index.html HTTP/1.0\n");

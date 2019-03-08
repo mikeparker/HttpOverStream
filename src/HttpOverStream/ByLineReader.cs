@@ -9,23 +9,14 @@ namespace HttpOverStream
 {
     public static class ByLineReader
     {
-        public static async Task<string> ReadLineAsync(this Stream stream, CancellationToken cancellationToken)
+        public static async Task<string> ReadLineAsync(IStreamReader asyncReader, CancellationToken cancellationToken)
         {
             var bytes = new List<byte>();
             var buffer = new byte[1];
             const byte lineSeparator = (byte)'\n';
             for (; ; )
             {
-                int read;
-                var namedPipeClientStream = stream as NamedPipeClientStream;
-                if (namedPipeClientStream != null)
-                {
-                    read = await namedPipeClientStream.ReadPipeAsync(buffer, 0, 1, cancellationToken).ConfigureAwait(false);
-                }
-                else
-                {
-                    read = await stream.ReadAsync(buffer, 0, 1, cancellationToken).ConfigureAwait(false);
-                }
+                var read = await asyncReader.ReadAsync(buffer, 0, 1, cancellationToken).ConfigureAwait(false);
                 if (read == 0)
                 {
                     // EOF -> throw

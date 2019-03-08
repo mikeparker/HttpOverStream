@@ -65,7 +65,8 @@ namespace HttpOverStream.Server.Owin
 
         private async Task PopulateRequestAsync(Stream stream, IOwinRequest request, CancellationToken cancellationToken)
         {
-            var firstLine = await stream.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            var streamReader = new NormalStreamReader(stream);
+            var firstLine = await ByLineReader.ReadLineAsync(streamReader, cancellationToken).ConfigureAwait(false);
             var parts = firstLine.Split(' ');
             if (parts.Length < 3)
             {
@@ -80,7 +81,7 @@ namespace HttpOverStream.Server.Owin
             }
             for (; ; )
             {
-                var line = await stream.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+                var line = await ByLineReader.ReadLineAsync(streamReader, cancellationToken).ConfigureAwait(false);
                 if (line.Length == 0)
                 {
                     break;

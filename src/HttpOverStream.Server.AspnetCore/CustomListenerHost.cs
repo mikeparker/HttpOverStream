@@ -60,11 +60,13 @@ namespace HttpOverStream.Server.AspnetCore
                 Console.WriteLine($"[CustomListenerHost]: error handling client stream: {e.Message}");
             }
         }
+
         static Uri _localhostUri = new Uri("http://localhost/");
 
         async Task<HttpRequestFeature> CreateRequestAsync(Stream stream, CancellationToken cancellationToken)
         {
-            var firstLine = await stream.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            var streamReader = new NormalStreamReader(stream);
+            var firstLine = await ByLineReader.ReadLineAsync(streamReader, cancellationToken).ConfigureAwait(false);
             var parts = firstLine.Split(' ');
             var result = new HttpRequestFeature();
 
@@ -77,8 +79,8 @@ namespace HttpOverStream.Server.AspnetCore
             result.Protocol = parts[2];
             for(; ; )
             {
-                var line = await stream.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-                if(line.Length == 0)
+                var line = await ByLineReader.ReadLineAsync(streamReader, cancellationToken).ConfigureAwait(false);
+                if (line.Length == 0)
                 {
                     break;
                 }

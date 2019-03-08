@@ -62,8 +62,7 @@ namespace HttpOverStream.Client
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             ValidateAndNormalizeRequest(request);
-            var stream = await _dial.DialAsync(request, cancellationToken).ConfigureAwait(false);
-
+            var (stream, streamLineReader) = await _dial.DialAsync(request, cancellationToken).ConfigureAwait(false);
             request.Properties.Add(UnderlyingStreamProperty, stream);
             await stream.WriteMethodAndHeadersAsync(request, cancellationToken).ConfigureAwait(false);
             if (request.Content != null)
@@ -74,11 +73,11 @@ namespace HttpOverStream.Client
 
             var responseContent = new DialResponseContent();
             var response = new HttpResponseMessage { RequestMessage = request, Content = responseContent };
-            string statusLine = await stream.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            string statusLine = await ByLineReader.ReadLineAsync(streamLineReader, cancellationToken).ConfigureAwait(false);
             ParseStatusLine(response, statusLine);
             for (; ; )
             {
-                var line = await stream.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+                var line = await ByLineReader.ReadLineAsync(streamLineReader, cancellationToken).ConfigureAwait(false);
                 if (line.Length == 0)
                 {
                     break;
@@ -152,7 +151,5 @@ namespace HttpOverStream.Client
                 request.Headers.ExpectContinue = false;
             }
         }
-
-
     }
 }
