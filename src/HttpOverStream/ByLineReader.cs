@@ -21,7 +21,7 @@ namespace HttpOverStream
                 {               
                     if (cancellationToken.IsCancellationRequested)
                     {
-                        throw new TaskCanceledException();
+                        throw new TaskCanceledException("Cancellation token triggered before we finished reading from the stream.");
                     }
                     // EOF -> throw     
                     throw new EndOfStreamException("Reached end of stream before finding a line seperator");

@@ -139,6 +139,8 @@ namespace HttpOverStream.Server.Owin.Tests
                 }
                 var ex = await logFactory.ExceptionReceived.Task;
                 Assert.IsInstanceOfType(ex, typeof(EndOfStreamException));
+
+                // Test the stream still works afterwards
                 var client = new HttpClient(new DialMessageHandler(dialer));
                 var result = await client.PostAsJsonAsync("http://localhost/api/e2e-tests/hello", new PersonMessage { Name = "Test" });
                 var wlcMsg = await result.Content.ReadAsAsync<WelcomeMessage>();
