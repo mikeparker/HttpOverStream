@@ -18,8 +18,12 @@ namespace HttpOverStream
             {
                 var read = await asyncReader.ReadAsync(buffer, 0, 1, cancellationToken).ConfigureAwait(false);
                 if (read == 0)
-                {
-                    // EOF -> throw
+                {               
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        throw new TaskCanceledException();
+                    }
+                    // EOF -> throw     
                     throw new EndOfStreamException("Reached end of stream before finding a line seperator");
                 }
                 if (buffer[0] == lineSeparator)

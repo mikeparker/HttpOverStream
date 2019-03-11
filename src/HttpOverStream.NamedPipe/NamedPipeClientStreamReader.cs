@@ -21,22 +21,34 @@ namespace HttpOverStream.NamedPipe
             return await ReadPipeAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
         }
 
+        public async Task<int> ReadPipeAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            var registration = cancellationToken.Register(() => ClosePipe(_stream));
+            return await _stream.ReadAsync(buffer, 0, 1, cancellationToken).ConfigureAwait(false);
+        }
+
+        private static void ClosePipe(PipeStream pipeStream)
+        {
+            pipeStream.Close();
+            pipeStream.Dispose();
+        }
+
         /* Taken from:
          * https://stackoverflow.com/questions/52632448/namedpipeserverstream-readasync-does-not-exit-when-cancellationtoken-requests
          * NamedPipeServerStream class does not implement ReadAsync itself, 
          * it inherits the method from one of its base classes, Stream. It can only detect 
          * cancellation  when the cancel occurred before you call ReadAsync(). Once the read is 
          * started it no longer can see a cancellation. */
-        public Task<int> ReadPipeAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
-        {
-            if (cancellationToken.IsCancellationRequested) return Task.FromCanceled<int>(cancellationToken);
-            var registration = cancellationToken.Register(() => CancelPipeIo(_stream));
-            var async = _stream.BeginRead(buffer, offset, count, null, null);
-            return new Task<int>(() => {
-                try { return _stream.EndRead(async); }
-                finally { registration.Dispose(); }
-            }, cancellationToken);
-        }
+        //public Task<int> ReadPipeAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        //{
+        //    if (cancellationToken.IsCancellationRequested) return Task.FromCanceled<int>(cancellationToken);
+        //    var registration = cancellationToken.Register(() => CancelPipeIo(_stream));
+        //    var async = _stream.BeginRead(buffer, offset, count, null, null);
+        //    return new Task<int>(() => {
+        //        try { return _stream.EndRead(async); }
+        //        finally { registration.Dispose(); }
+        //    }, cancellationToken);
+        //}
 
         private static void CancelPipeIo(PipeStream pipe)
         {
