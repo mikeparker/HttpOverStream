@@ -7,6 +7,6 @@ namespace HttpOverStream
 {
     public interface IDial
     {
-        ValueTask<(Stream, IStreamReader)> DialAsync(HttpRequestMessage request, CancellationToken cancellationToken);
+        ValueTask<Stream> DialAsync(HttpRequestMessage request, CancellationToken cancellationToken);
     }
 }

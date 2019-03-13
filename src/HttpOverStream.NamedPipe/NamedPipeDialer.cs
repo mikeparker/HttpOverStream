@@ -25,12 +25,15 @@ namespace HttpOverStream.NamedPipe
             _timeout = timeout;
         }
 
-        public async ValueTask<(Stream, IStreamReader)> DialAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public async ValueTask<Stream> DialAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var pipeStream = new NamedPipeClientStream(_serverName, _pipeName, PipeDirection.InOut, _pipeOptions);
             await pipeStream.ConnectAsync(_timeout, cancellationToken).ConfigureAwait(false);
-            var streamReader = new NamedPipeClientStreamReader(pipeStream);
-            return (pipeStream, streamReader);
+            if (cancellationToken.CanBeCanceled)
+            {
+                var registration = cancellationToken.Register(() => pipeStream.Dispose());
+            }
+            return pipeStream;
         }
     }
 }

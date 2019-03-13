@@ -41,6 +41,8 @@ namespace HttpOverStream.Server.AspnetCore
                 using (stream)
                 {
                     var httpCtx = new DefaultHttpContext();
+
+                    // Currently this returns here and continues - maybe want a more explicit background thread / task
                     var requestFeature = await CreateRequestAsync(stream, CancellationToken.None).ConfigureAwait(false);
                     httpCtx.Features.Set<IHttpRequestFeature>(requestFeature);
                     var responseFeature = new HttpResponseFeature();
@@ -65,8 +67,7 @@ namespace HttpOverStream.Server.AspnetCore
 
         async Task<HttpRequestFeature> CreateRequestAsync(Stream stream, CancellationToken cancellationToken)
         {
-            var streamReader = new NormalStreamReader(stream);
-            var firstLine = await ByLineReader.ReadLineAsync(streamReader, cancellationToken).ConfigureAwait(false);
+            var firstLine = await stream.ReadLineAsync(cancellationToken).ConfigureAwait(false);
             var parts = firstLine.Split(' ');
             var result = new HttpRequestFeature();
 
@@ -79,7 +80,7 @@ namespace HttpOverStream.Server.AspnetCore
             result.Protocol = parts[2];
             for(; ; )
             {
-                var line = await ByLineReader.ReadLineAsync(streamReader, cancellationToken).ConfigureAwait(false);
+                var line = await stream.ReadLineAsync(cancellationToken).ConfigureAwait(false);
                 if (line.Length == 0)
                 {
                     break;

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace HttpOverStream.Client
 {
+    // Dispose?
     public class DialMessageHandler : HttpMessageHandler
     {
         public const string UnderlyingStreamProperty = "DIAL_UNDERLYING_STREAM";
@@ -30,6 +31,8 @@ namespace HttpOverStream.Client
 
             protected override Task SerializeToStreamAsync(Stream stream, TransportContext context)
             {
+                // This can't work, can it? It won't call the CopyToAsync on the underlying stream?
+                // But maybe it doesnt matter..?
                 return _stream.CopyToAsync(stream);
             }
 
@@ -62,7 +65,7 @@ namespace HttpOverStream.Client
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             ValidateAndNormalizeRequest(request);
-            var (stream, streamLineReader) = await _dial.DialAsync(request, cancellationToken).ConfigureAwait(false);
+            var stream = await _dial.DialAsync(request, cancellationToken).ConfigureAwait(false);
             request.Properties.Add(UnderlyingStreamProperty, stream);
             await stream.WriteMethodAndHeadersAsync(request, cancellationToken).ConfigureAwait(false);
             if (request.Content != null)
@@ -71,13 +74,14 @@ namespace HttpOverStream.Client
             }
             await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
 
+            // Dispose responseContent?
             var responseContent = new DialResponseContent();
             var response = new HttpResponseMessage { RequestMessage = request, Content = responseContent };
-            string statusLine = await ByLineReader.ReadLineAsync(streamLineReader, cancellationToken).ConfigureAwait(false);
+            string statusLine = await stream.ReadLineAsync(cancellationToken).ConfigureAwait(false);
             ParseStatusLine(response, statusLine);
             for (; ; )
             {
-                var line = await ByLineReader.ReadLineAsync(streamLineReader, cancellationToken).ConfigureAwait(false);
+                var line = await stream.ReadLineAsync(cancellationToken).ConfigureAwait(false);
                 if (line.Length == 0)
                 {
                     break;
@@ -95,8 +99,13 @@ namespace HttpOverStream.Client
                     throw new HttpRequestException("Error parsing header", ex);
                 }
             }
+
+            // Should probably have a catch -> Dispose the content and rethrow
+
+            // This is a bit weird - passing disposable objects inside the SetConten
             responseContent.SetContent(new BodyStream(stream, response.Content.Headers.ContentLength, closeOnReachEnd:true), response.Content.Headers.ContentLength);
             return response;
+
         }
 
         private void ParseStatusLine(HttpResponseMessage response, string line)

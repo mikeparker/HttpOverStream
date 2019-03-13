@@ -16,11 +16,11 @@ namespace HttpOverStream.Tests
             ms.Flush();
             ms.Position = 0;
             var streamReader = new NormalStreamReader(ms);
-            Assert.Equal("first line", await ReadLineAsync(streamReader));
-            Assert.Equal("second longer line", await ReadLineAsync(streamReader));
-            Assert.Equal("third line", await ReadLineAsync(streamReader));
-            Assert.Equal("hello", await ReadLineAsync(streamReader));
-            Assert.Equal("", await ReadLineAsync(streamReader));
+            Assert.Equal("first line", await ms.ReadLineAsync(CancellationToken.None));
+            Assert.Equal("second longer line", await ms.ReadLineAsync(CancellationToken.None));
+            Assert.Equal("third line", await ms.ReadLineAsync(CancellationToken.None));
+            Assert.Equal("hello", await ms.ReadLineAsync(CancellationToken.None));
+            Assert.Equal("", await ms.ReadLineAsync(CancellationToken.None));
         }
         [Fact]
         public async Task TestWithLf()
@@ -29,12 +29,11 @@ namespace HttpOverStream.Tests
             ms.Write(Encoding.UTF8.GetBytes("first line\nsecond longer line\nthird line\nhello\n\n"));
             ms.Flush();
             ms.Position = 0;
-            var streamReader = new NormalStreamReader(ms);
-            Assert.Equal("first line", await ReadLineAsync(streamReader));
-            Assert.Equal("second longer line", await ReadLineAsync(streamReader));
-            Assert.Equal("third line", await ReadLineAsync(streamReader));
-            Assert.Equal("hello", await ReadLineAsync(streamReader));
-            Assert.Equal("", await ReadLineAsync(streamReader));
+            Assert.Equal("first line", await ms.ReadLineAsync(CancellationToken.None));
+            Assert.Equal("second longer line", await ms.ReadLineAsync(CancellationToken.None));
+            Assert.Equal("third line", await ms.ReadLineAsync(CancellationToken.None));
+            Assert.Equal("hello", await ms.ReadLineAsync(CancellationToken.None));
+            Assert.Equal("", await ms.ReadLineAsync(CancellationToken.None));
         }
        
         [Fact]
@@ -45,14 +44,9 @@ namespace HttpOverStream.Tests
             ms.Flush();
             ms.Position = 0;
             var streamReader = new NormalStreamReader(ms);
-            Assert.Equal("aaa", await ReadLineAsync(streamReader));
-            Assert.Equal("second longer line", await ReadLineAsync(streamReader));
-            await Assert.ThrowsAsync<EndOfStreamException>(async ()=> await ReadLineAsync(streamReader));
-        }
-
-        private async Task<string> ReadLineAsync(IStreamReader streamReader)
-        {
-            return await ByLineReader.ReadLineAsync(streamReader, CancellationToken.None);
+            Assert.Equal("aaa", await ms.ReadLineAsync(CancellationToken.None));
+            Assert.Equal("second longer line", await ms.ReadLineAsync(CancellationToken.None));
+            await Assert.ThrowsAsync<EndOfStreamException>(async ()=> await ms.ReadLineAsync(CancellationToken.None));
         }
     }
 }

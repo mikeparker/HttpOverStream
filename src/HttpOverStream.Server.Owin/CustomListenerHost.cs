@@ -31,22 +31,33 @@ namespace HttpOverStream.Server.Owin
 
         private void Start()
         {
-            _listener.StartAsync(OnAccept, CancellationToken.None).Wait();
+            _listener.StartAsync(OnAccept, CancellationToken.None)
+                .Wait();
         }
 
         private async void OnAccept(Stream stream)
         {
             try
             {
+                // TODO: Add a server side timeout, create a cancellationTokenSource
+                // TODO: Write test for server side timeout (client takes ages to finish writing)
                 using (stream)
                 {
+                    // CTS static method with timeout, pass into the CT functions 
+                    // Register a stream dispose on cancellationToken
                     var owinContext = new OwinContext();
                     owinContext.Set("owin.Version", "1.0");
                     await PopulateRequestAsync(stream, owinContext.Request, CancellationToken.None).ConfigureAwait(false);
+
+                    // Memory stream is a bit of a hack here because ASP.NET doesnt guarantee it finishes writing headers
+                    // before adding to the content
                     var body = new MemoryStream();
                     owinContext.Response.Body = body;
+
                     // execute higher level middleware
+                    // TODO: Can we pass the cancellationToken to the middleware?
                     await _app(owinContext.Environment).ConfigureAwait(false);
+
                     // write the response
                     await body.FlushAsync().ConfigureAwait(false);
                     await stream.WriteResponseStatusAndHeadersAsync(owinContext.Request.Protocol, owinContext.Response.StatusCode.ToString(), owinContext.Response.ReasonPhrase, owinContext.Response.Headers.Select(i => new KeyValuePair<string, IEnumerable<string>>(i.Key, i.Value)), CancellationToken.None).ConfigureAwait(false);
@@ -65,8 +76,7 @@ namespace HttpOverStream.Server.Owin
 
         private async Task PopulateRequestAsync(Stream stream, IOwinRequest request, CancellationToken cancellationToken)
         {
-            var streamReader = new NormalStreamReader(stream);
-            var firstLine = await ByLineReader.ReadLineAsync(streamReader, cancellationToken).ConfigureAwait(false);
+            var firstLine = await stream.ReadLineAsync(cancellationToken).ConfigureAwait(false);
             var parts = firstLine.Split(' ');
             if (parts.Length < 3)
             {
@@ -81,7 +91,7 @@ namespace HttpOverStream.Server.Owin
             }
             for (; ; )
             {
-                var line = await ByLineReader.ReadLineAsync(streamReader, cancellationToken).ConfigureAwait(false);
+                var line = await stream.ReadLineAsync(cancellationToken).ConfigureAwait(false);
                 if (line.Length == 0)
                 {
                     break;
