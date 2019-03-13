@@ -54,38 +54,23 @@ namespace HttpOverStream.Server.Owin.Tests
     [TestClass]
     public class EndToEndTests
     {
+        public TestContext TestContext { get; set; }
+
         [TestMethod]
         public async Task TestGet()
         {
-            using (CustomListenerHost.Start(SetupDefaultAppBuilder, new NamedPipeListener("legacy_test_get")))
+            using (CustomListenerHost.Start(SetupDefaultAppBuilder, new NamedPipeListener(TestContext.TestName)))
             {
-                var client = new HttpClient(new DialMessageHandler(new NamedPipeDialer("legacy_test_get")));
+                var client = new HttpClient(new DialMessageHandler(new NamedPipeDialer(TestContext.TestName)));
                 var result = await client.GetAsync("http://localhost/api/e2e-tests/hello-world");
                 Assert.AreEqual("Hello World", await result.Content.ReadAsAsync<string>());
             }
         }
 
         [TestMethod]
-        public async Task TestServerTimeout()
-        {
-            using (CustomListenerHost.Start(SetupDefaultAppBuilder, new NamedPipeListener("legacy_test_get")))
-            {
-                var client = new HttpClient(new DialMessageHandler(new NamedPipeDialer("legacy_test_get")));
-                client.Timeout = TimeSpan.FromMilliseconds(100);
-                var sw = Stopwatch.StartNew();
-                await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () =>
-                {
-                    await client.GetAsync("http://localhost/api/e2e-tests/timeout");
-                });
-                sw.Stop();
-                Assert.IsTrue(sw.ElapsedMilliseconds < 1000, $"GetAsync took too long ({sw.ElapsedMilliseconds} ms)");
-            }
-        }
-
-        [TestMethod]
         public async Task TestBodyStream()
         {
-            var listener = new NamedPipeListener("test-body-stream");
+            var listener = new NamedPipeListener(TestContext.TestName);
             var payload = Encoding.UTF8.GetBytes("Hello world");
             await listener.StartAsync(con =>
             {
@@ -96,8 +81,8 @@ namespace HttpOverStream.Server.Owin.Tests
             }, CancellationToken.None);
 
 
-            var dialer = new NamedPipeDialer("test-body-stream");
-            var (stream, _) = await dialer.DialAsync(new HttpRequestMessage(), CancellationToken.None);
+            var dialer = new NamedPipeDialer(TestContext.TestName);
+            var stream = await dialer.DialAsync(new HttpRequestMessage(), CancellationToken.None);
             var bodyStream = new BodyStream(stream, payload.Length);
             var data = new byte[4096];
             var read = await bodyStream.ReadAsync(data, 0, data.Length);
@@ -110,9 +95,9 @@ namespace HttpOverStream.Server.Owin.Tests
         [TestMethod]
         public async Task TestPost()
         {
-            using (CustomListenerHost.Start(SetupDefaultAppBuilder, new NamedPipeListener("legacy_test_post")))
+            using (CustomListenerHost.Start(SetupDefaultAppBuilder, new NamedPipeListener(TestContext.TestName)))
             {
-                var client = new HttpClient(new DialMessageHandler(new NamedPipeDialer("legacy_test_post")));
+                var client = new HttpClient(new DialMessageHandler(new NamedPipeDialer(TestContext.TestName)));
                 var result = await client.PostAsJsonAsync("http://localhost/api/e2e-tests/hello", new PersonMessage { Name = "Test" });
                 var wlcMsg = await result.Content.ReadAsAsync<WelcomeMessage>();
                 Assert.AreEqual("Hello Test", wlcMsg.Text);
@@ -124,13 +109,13 @@ namespace HttpOverStream.Server.Owin.Tests
         {
             var logFactory = new TestLoggerFactory();
             using (CustomListenerHost.Start(app =>
+                                    {
+                                        SetupDefaultAppBuilder(app);
+                                        app.SetLoggerFactory(logFactory);
+                                    }, new NamedPipeListener(TestContext.TestName)))
             {
-                SetupDefaultAppBuilder(app);
-                app.SetLoggerFactory(logFactory);
-            }, new NamedPipeListener("test_stream_interuption")))
-            {
-                var dialer = new NamedPipeDialer("test_stream_interuption");
-                var (fuzzyStream, streamReader) = await dialer.DialAsync(new HttpRequestMessage(), CancellationToken.None);
+                var dialer = new NamedPipeDialer(TestContext.TestName);
+                var fuzzyStream = await dialer.DialAsync(new HttpRequestMessage(), CancellationToken.None);
                 using (fuzzyStream)
                 {
                     // just write the first line of a valid http request, and drop the connection
@@ -145,6 +130,23 @@ namespace HttpOverStream.Server.Owin.Tests
                 var result = await client.PostAsJsonAsync("http://localhost/api/e2e-tests/hello", new PersonMessage { Name = "Test" });
                 var wlcMsg = await result.Content.ReadAsAsync<WelcomeMessage>();
                 Assert.AreEqual("Hello Test", wlcMsg.Text);
+            }
+        }
+
+        [TestMethod]
+        public async Task TestClientTimeoutIsRespectedWhenServerTakesTooLong()
+        {
+            using (CustomListenerHost.Start(SetupDefaultAppBuilder, new NamedPipeListener(TestContext.TestName)))
+            {
+                var client = new HttpClient(new DialMessageHandler(new NamedPipeDialer(TestContext.TestName)));
+                client.Timeout = TimeSpan.FromMilliseconds(100);
+                var sw = Stopwatch.StartNew();
+                await Assert.ThrowsExceptionAsync<TaskCanceledException>(async () =>
+                {
+                    await client.GetAsync("http://localhost/api/e2e-tests/timeout");
+                });
+                sw.Stop();
+                Assert.IsTrue(sw.ElapsedMilliseconds < 1000, $"GetAsync took too long ({sw.ElapsedMilliseconds} ms)");
             }
         }
 
